@@ -120,6 +120,8 @@ class Orders extends REST_Controller {
 
   }
 
+  
+
   public function delete_order_delete($token = "0", $id_usuario = "0", $order_id ="0"){
 
     if ($token == '0' || $id_usuario == '0' || $order_id == '0') {
@@ -169,32 +171,33 @@ class Orders extends REST_Controller {
 
 //Functions for iOS "StoreAlmofire"
 
-    public function create_order_post(){
-      $data = $this->post();
+public function create_order_post(){
+      $id = $_POST['id'];
+      $items = $_POST['items'];
 
        //evaluamos si vienen items
-    if (!isset($data['items']) || strlen($data['items']) == 0 ) {
-      $res = array('error' => TRUE ,'message'=> 'Items empty in post' );
-      $this->response($res, REST_Controller::HTTP_BAD_REQUEST);
-    }
+    // if (!isset($items) || strlen($items) == 0 ) {
+    //   $res = array('error' => TRUE ,'message'=> 'Items empty in post' );
+    //   $this->response($res, REST_Controller::HTTP_BAD_REQUEST);
+    // }
 
     //todo bien, items, user, token
-    $condicions  = array('id' => $id_usuario,'token'=>$token );
+    $condicions  = array('id' => $id);
     $this->db->where($condicions);
-    $query = $this->db->get('login');
+    $query = $this->db->get('users');
 
     $exist = $query->row();
 
     if(!$exist){
-      $res = array('error' => TRUE ,'message'=> 'Token and User invalid' );
+      $res = array('error' => TRUE ,'message'=> 'User invalid' );
       $this->response($res);
       return;
     }
 
-    //User and Token OK
+    //User  OK
     $this->db->reset_query();
 
-    $insert = array('usuario_id' => $id_usuario );
+    $insert = array('usuario_id' => $id );
     //lo grabamos en bd tabla ordenes
     $this->db->insert('ordenes', $insert);
     //regresa el id de la ultima insersion en bd
@@ -205,7 +208,7 @@ class Orders extends REST_Controller {
 
     //crear detalle de la orden, separar los items del Json
     //nos devuelve solo los items
-    $items = explode(',', $data['items']);
+    // $items = explode(',', $items);
     // $this->response($items);
 
     //separamos los items que seran producto_id (ordenes_detalle)
@@ -213,17 +216,57 @@ class Orders extends REST_Controller {
     foreach ($items as &$producto_id) {
       //'producto_id' y 'orden_id' corresponden a la tabla ordenes_detalle
      $data_insert = array('producto_id' => $producto_id ,'orden_id' => $orde_id );
+
      $this->db->insert('ordenes_detalle', $data_insert);
     }
-    $res = array('error' => FALSE ,'orden_id'=> $orde_id );
+
+    $res = array('error' => FALSE,'orden_id'=> $orde_id );
     $this->response($res);
 
 
+ }
 
+
+ public function get_ordersiOS_post($token = "0", $id_usuario = "0"){
+
+    $id_usuario = $_POST['id'];
+    
+    if ($id_usuario == '0') {
+      $res = array('error' => TRUE ,'message'=> 'user invalid' );
+      $this->response($res, REST_Controller::HTTP_BAD_REQUEST);
+      return;
     }
 
+    //todo bien, items, user, token
+    $condicions  = array('id' => $id_usuario );
+    $this->db->where($condicions);
+    $query = $this->db->get('users');
 
+    $exist = $query->row();
 
+    if(!$exist){
+      $res = array('error' => TRUE ,'message'=> ' User invalid' );
+      $this->response($res);
+      return;
+    }
+
+    // //token existe y es valido
+    //query obtener ordenes de un User
+    $query = $this->db->query('SELECT * FROM `ordenes` where usuario_id = ' . $id_usuario );
+
+    $ordes = array();
+
+    foreach ($query->result() as $row) {
+      $query_detail = $this->db->query('SELECT a.orden_id, b.* FROM `ordenes_detalle` a INNER JOIN productos b on a.producto_id = b.codigo WHERE orden_id = '. $row->id);
+      $order = array('id' =>$row->id , 'creado_en' => $row->creado_en, 'detalle' => $query_detail->result() );
+      //add al array items
+      array_push($ordes,$order);
+    }
+
+    $res = array('error' => FALSE ,'orders'=> $ordes );
+    $this->response($res);
+
+  }
 
 
 
